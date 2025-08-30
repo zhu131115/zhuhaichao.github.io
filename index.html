@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>朱海潮网</title>
+		<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+		<style>
+			body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+			#messageInput { width: 300px; height: 60px; margin: 10px 0; }
+			.message { border-bottom: 1px solid #eee; padding: 10px 0; }
+			button { padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+			button:hover { background: #0056b3; }
+		</style>
+	</head>
+	<body>
+		<h1>欢迎</h1>
+		<p>在此声明本站基于github的网站功能</p>
+		<p>你们可以在这说点什么</p>
+		
+		<!-- 留言输入区域 -->
+		<div>
+			<input type="text" id="nameInput" placeholder="你的名字"><br>
+			<textarea id="messageInput" placeholder="你的留言"></textarea><br>
+			<button onclick="sendMessage()">提交留言</button>
+		</div>
+
+		<hr>
+		<h2>所有留言</h2>
+		<!-- 留言显示区域 -->
+		<div id="messages">正在加载留言...</div>
+
+		<script>
+			// Supabase 配置
+			const supabaseUrl = 'https://vtjzurdlpduvfeqkbfrg.supabase.co';
+			const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0anp1cmRscGR1dmZlcWtiZnJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY1MzI3MTQsImV4cCI6MjA3MjEwODcxNH0.0rMc8_xBgK-UYbKn0VA5IlIprTfKyA8aSHXbkwiUazQ';
+			
+			// 初始化 Supabase 客户端（添加auth配置解决CORS问题）
+			const supabase = window.supabase.createClient(supabaseUrl, supabaseKey, {
+				auth: {
+					// 这行很重要：解决CORS问题
+					autoRefreshToken: true,
+					persistSession: true,
+					detectSessionInUrl: true
+				}
+			});
+
+			// 加载并显示所有留言
+			async function loadMessages() {
+				try {
+					// 从数据库查询 messages 表的所有数据，并按创建时间倒序排列
+					let { data: messages, error } = await supabase
+						.from('messages')
+						.select('*')
+						.order('created_at', { ascending: false });
+
+					if (error) {
+						console.error('获取留言出错:', error);
+						document.getElementById('messages').innerHTML = '加载失败，请查看控制台错误信息';
+						return;
+					}
+
+					// 将留言显示到网页上
+					const messagesContainer = document.getElementById('messages');
+					
+					if (messages.length === 0) {
+						messagesContainer.innerHTML = '还没有留言，快来第一个发言吧！';
+						return;
+					}
+
+					messagesContainer.innerHTML = ''; // 清空容器
+
+					messages.forEach(msg => {
+						const messageElement = document.createElement('div');
+						messageElement.classList.add('message');
+						// 格式化一下时间
+						const time = new Date(msg.created_at).toLocaleString('zh-CN');
+						messageElement.innerHTML = `<strong>${msg.username}</strong> <span style="color: gray; font-size: 0.8em;">(${time})</span>:<br>${msg.content}`;
+						messagesContainer.appendChild(messageElement);
+					});
+				} catch (err) {
+					console.error('发生错误:', err);
+					document.getElementById('messages').innerHTML = '发生错误，请查看控制台';
+				}
+			}
+
+			// 发送新留言
+			async function sendMessage() {
+				const username = document.getElementById('nameInput').value;
+				const content = document.getElementById('messageInput').value;
+
+				if (!username || !content) {
+					alert('请填写名字和留言内容！');
+					return;
+				}
+
+				try {
+					// 插入数据到数据库
+					const { data, error } = await supabase
+						.from('messages')
+						.insert([{ 
+							username: username, 
+							content: content 
+						}]);
+
+					if (error) {
+						console.error('发送留言出错:', error);
+						alert('发送失败！错误信息已输出到控制台');
+					} else {
+						console.log('留言发送成功！', data);
+						// 清空输入框
+						document.getElementById('nameInput').value = '';
+						document.getElementById('messageInput').value = '';
+						// 重新加载留言列表
+						loadMessages();
+						alert('留言成功！');
+					}
+				} catch (err) {
+					console.error('发送时发生错误:', err);
+					alert('发送失败，请查看控制台错误信息');
+				}
+			}
+
+			// 页面加载时自动获取留言
+			document.addEventListener('DOMContentLoaded', function() {
+				loadMessages();
+			});
+		</script>
+	</body>
+</html>
